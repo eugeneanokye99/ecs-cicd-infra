@@ -1,0 +1,248 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Pipeline stack - S3 artifacts, CodeDeploy blue/green, CodePipeline, and EventBridge trigger
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ecs-cicd
+  Environment:
+    Type: String
+    Default: prod
+  ECRRepositoryName:
+    Type: String
+  ECSClusterName:
+    Type: String
+  ECSServiceName:
+    Type: String
+  ALBListenerArn:
+    Type: String
+  ALBTestListenerArn:
+    Type: String
+  BlueTargetGroupName:
+    Type: String
+  GreenTargetGroupName:
+    Type: String
+  CodeDeployRoleArn:
+    Type: String
+  CodePipelineRoleArn:
+    Type: String
+  EventBridgePipelineRoleArn:
+    Type: String
+
+Resources:
+  # ── S3 Artifact Bucket ────────────────────────────────────────────────────────
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub ${ProjectName}-artifacts-${AWS::AccountId}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldArtifacts
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-artifacts
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+  ArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyNonSSL
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt ArtifactBucket.Arn
+              - !Sub ${ArtifactBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  # ── CodeDeploy Application ────────────────────────────────────────────────────
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub ${ProjectName}-app
+      ComputePlatform: ECS
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+  # ── CodeDeploy Deployment Group (Blue/Green) ──────────────────────────────────
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub ${ProjectName}-deployment-group
+      ServiceRoleArn: !Ref CodeDeployRoleArn
+      DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+      DeploymentStyle:
+        DeploymentOption: WITH_TRAFFIC_CONTROL
+        DeploymentType: BLUE_GREEN
+      BlueGreenDeploymentConfiguration:
+        DeploymentReadyOption:
+          ActionOnTimeout: CONTINUE_DEPLOYMENT
+          WaitTimeInMinutes: 0
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 5
+      ECSServices:
+        - ClusterName: !Ref ECSClusterName
+          ServiceName: !Ref ECSServiceName
+      LoadBalancerInfo:
+        TargetGroupPairInfoList:
+          - ProdTrafficRoute:
+              ListenerArns:
+                - !Ref ALBListenerArn
+            TestTrafficRoute:
+              ListenerArns:
+                - !Ref ALBTestListenerArn
+            TargetGroups:
+              - Name: !Ref BlueTargetGroupName
+              - Name: !Ref GreenTargetGroupName
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+  # ── CodePipeline ──────────────────────────────────────────────────────────────
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${ProjectName}-pipeline
+      RoleArn: !Ref CodePipelineRoleArn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      PipelineType: V2
+      Stages:
+        # Source Stage: S3 only.
+        # GitHub Actions bundles appspec.yaml, taskdef.json AND imageDetail.json
+        # into deploy-bundle.zip and uploads it to S3 after pushing to ECR.
+        # ECR push → EventBridge → starts this pipeline → S3 source picks up the bundle.
+        - Name: Source
+          Actions:
+            - Name: S3DeployBundle
+              RunOrder: 1
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                S3Bucket: !Ref ArtifactBucket
+                S3ObjectKey: deploy/deploy-bundle.zip
+                # Polling disabled — EventBridge fires the pipeline on ECR push
+                PollForSourceChanges: 'false'
+              OutputArtifacts:
+                - Name: S3Output
+
+        # Deploy Stage: Blue/Green deployment via CodeDeploy.
+        # Image1ArtifactName: S3Output means CodeDeploy reads imageDetail.json
+        # from the S3 bundle to locate the exact image pushed by GitHub Actions.
+        - Name: Deploy
+          Actions:
+            - Name: BlueGreenDeploy
+              RunOrder: 1
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeployToECS
+                Version: '1'
+              Configuration:
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+                TaskDefinitionTemplateArtifact: S3Output
+                TaskDefinitionTemplatePath: taskdef.json
+                AppSpecTemplateArtifact: S3Output
+                AppSpecTemplatePath: appspec.yaml
+                Image1ArtifactName: S3Output
+                Image1ContainerName: app
+              InputArtifacts:
+                - Name: S3Output
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+  # ── EventBridge Rule: ECR push → CodePipeline ─────────────────────────────────
+  ECRPushEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${ProjectName}-ecr-push-trigger
+      Description: Trigger CodePipeline when a new image is pushed to ECR
+      State: ENABLED
+      EventPattern:
+        source:
+          - aws.ecr
+        detail-type:
+          - ECR Image Action
+        detail:
+          action-type:
+            - PUSH
+          result:
+            - SUCCESS
+          repository-name:
+            - !Ref ECRRepositoryName
+      Targets:
+        - Id: TriggerCodePipeline
+          Arn: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Pipeline}
+          RoleArn: !Ref EventBridgePipelineRoleArn
+
+Outputs:
+  ArtifactBucketName:
+    Value: !Ref ArtifactBucket
+    Export:
+      Name: !Sub ${ProjectName}-ArtifactBucketName
+
+  ArtifactBucketArn:
+    Value: !GetAtt ArtifactBucket.Arn
+    Export:
+      Name: !Sub ${ProjectName}-ArtifactBucketArn
+
+  PipelineName:
+    Value: !Ref Pipeline
+    Export:
+      Name: !Sub ${ProjectName}-PipelineName
+
+  CodeDeployApplicationName:
+    Value: !Ref CodeDeployApplication
+    Export:
+      Name: !Sub ${ProjectName}-CodeDeployAppName
+
+  CodeDeployDeploymentGroupName:
+    Value: !Ref CodeDeployDeploymentGroup
+    Export:
+      Name: !Sub ${ProjectName}-CodeDeployGroupName

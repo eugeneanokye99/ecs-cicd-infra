@@ -1,0 +1,255 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Master stack for ECS CI/CD lab — Eugene Anokye.
+  Orchestrates all nested stacks: Network, Security, ECR, Logging, IAM, ECS, Pipeline, Monitoring.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ecs-cicd
+    Description: Short name used as a prefix for all resource names
+
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [prod, staging, dev]
+    Description: Deployment environment
+
+  GithubOrg:
+    Type: String
+    Description: GitHub organization or username that owns the application repository
+
+  GithubRepo:
+    Type: String
+    Default: ecs-cicd-app
+    Description: GitHub application repository name
+
+  TemplatesBucket:
+    Type: String
+    Description: |
+      S3 bucket where nested stack templates are stored.
+      Run scripts/upload-templates.sh to populate this bucket before deploying.
+
+  TemplatesPrefix:
+    Type: String
+    Default: stacks
+    Description: S3 key prefix for nested template files
+
+Resources:
+  # ── Phase 1: Network ──────────────────────────────────────────────────────────
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/network.yaml
+      TimeoutInMinutes: 20
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Phase 2: Security ─────────────────────────────────────────────────────────
+  SecurityStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: NetworkStack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/security.yaml
+      TimeoutInMinutes: 10
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        VpcId: !GetAtt NetworkStack.Outputs.VpcId
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Phase 3: ECR ──────────────────────────────────────────────────────────────
+  ECRStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/ecr.yaml
+      TimeoutInMinutes: 10
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Phase 4: Logging ──────────────────────────────────────────────────────────
+  LoggingStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/logging.yaml
+      TimeoutInMinutes: 10
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Phase 5: IAM ──────────────────────────────────────────────────────────────
+  IAMStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - ECRStack
+      - LoggingStack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/iam.yaml
+      TimeoutInMinutes: 15
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        GithubOrg: !Ref GithubOrg
+        GithubRepo: !Ref GithubRepo
+        ECRRepositoryArn: !GetAtt ECRStack.Outputs.RepositoryArn
+        LogGroupArn: !GetAtt LoggingStack.Outputs.LogGroupArn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Phase 6: ECS (Cluster, ALB, Service, Auto Scaling) ───────────────────────
+  ECSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - NetworkStack
+      - SecurityStack
+      - IAMStack
+      - LoggingStack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/ecs.yaml
+      TimeoutInMinutes: 30
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        VpcId: !GetAtt NetworkStack.Outputs.VpcId
+        PublicSubnetA: !GetAtt NetworkStack.Outputs.PublicSubnetA
+        PublicSubnetB: !GetAtt NetworkStack.Outputs.PublicSubnetB
+        PrivateSubnetA: !GetAtt NetworkStack.Outputs.PrivateSubnetA
+        PrivateSubnetB: !GetAtt NetworkStack.Outputs.PrivateSubnetB
+        ALBSecurityGroupId: !GetAtt SecurityStack.Outputs.ALBSecurityGroupId
+        ECSSecurityGroupId: !GetAtt SecurityStack.Outputs.ECSSecurityGroupId
+        TaskExecutionRoleArn: !GetAtt IAMStack.Outputs.TaskExecutionRoleArn
+        LogGroupName: !GetAtt LoggingStack.Outputs.LogGroupName
+        ECRRepositoryUri: !GetAtt ECRStack.Outputs.RepositoryUri
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Phase 7: Pipeline (CodeDeploy, CodePipeline, EventBridge) ─────────────────
+  PipelineStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - ECSStack
+      - IAMStack
+      - ECRStack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/pipeline.yaml
+      TimeoutInMinutes: 20
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        ECRRepositoryName: !GetAtt ECRStack.Outputs.RepositoryName
+        ECSClusterName: !GetAtt ECSStack.Outputs.ClusterName
+        ECSServiceName: !GetAtt ECSStack.Outputs.ServiceName
+        ALBListenerArn: !GetAtt ECSStack.Outputs.ALBListenerArn
+        ALBTestListenerArn: !GetAtt ECSStack.Outputs.ALBTestListenerArn
+        BlueTargetGroupName: !GetAtt ECSStack.Outputs.BlueTargetGroupName
+        GreenTargetGroupName: !GetAtt ECSStack.Outputs.GreenTargetGroupName
+        CodeDeployRoleArn: !GetAtt IAMStack.Outputs.CodeDeployRoleArn
+        CodePipelineRoleArn: !GetAtt IAMStack.Outputs.CodePipelineRoleArn
+        EventBridgePipelineRoleArn: !GetAtt IAMStack.Outputs.EventBridgePipelineRoleArn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Phase 8: Monitoring ───────────────────────────────────────────────────────
+  MonitoringStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - ECSStack
+      - PipelineStack
+    Properties:
+      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/monitoring.yaml
+      TimeoutInMinutes: 10
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        ECSClusterName: !GetAtt ECSStack.Outputs.ClusterName
+        ECSServiceName: !GetAtt ECSStack.Outputs.ServiceName
+        ALBFullName: !GetAtt ECSStack.Outputs.ALBFullName
+        TargetGroupFullName: !GetAtt ECSStack.Outputs.BlueTargetGroupFullName
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  ALBEndpoint:
+    Description: Application Load Balancer public URL
+    Value: !Sub http://${ECSStack.Outputs.ALBDnsName}
+
+  ECRRepositoryUri:
+    Description: ECR Repository URI — use this when pushing images
+    Value: !GetAtt ECRStack.Outputs.RepositoryUri
+
+  GitHubOIDCRoleArn:
+    Description: Role ARN to set as AWS_ROLE_ARN in GitHub Actions secrets
+    Value: !GetAtt IAMStack.Outputs.GitHubOIDCRoleArn
+
+  ArtifactBucketName:
+    Description: S3 bucket for CodePipeline artifacts and deploy bundles
+    Value: !GetAtt PipelineStack.Outputs.ArtifactBucketName
+
+  CloudWatchDashboard:
+    Description: CloudWatch dashboard for service health
+    Value: !Sub https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${MonitoringStack.Outputs.DashboardName}

@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Logging stack - CloudWatch Log Group for ECS tasks
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ecs-cicd
+  Environment:
+    Type: String
+    Default: prod
+
+Resources:
+  ECSLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /ecs/${ProjectName}
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+Outputs:
+  LogGroupName:
+    Value: !Ref ECSLogGroup
+    Export:
+      Name: !Sub ${ProjectName}-LogGroupName
+
+  LogGroupArn:
+    Value: !GetAtt ECSLogGroup.Arn
+    Export:
+      Name: !Sub ${ProjectName}-LogGroupArn
