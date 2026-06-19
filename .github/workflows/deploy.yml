@@ -1,0 +1,133 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  STACK_NAME: ecs-cicd-master
+  TEMPLATES_PREFIX: stacks
+
+jobs:
+  # ── Validate templates on every push (both branches) ─────────────────────────
+  validate:
+    name: Validate CloudFormation Templates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout infrastructure code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: github-actions-cfn-validate
+
+      - name: Validate all nested stack templates
+        run: |
+          echo "Validating nested stack templates..."
+          for template in stacks/*.yaml; do
+            echo "  Checking: ${template}"
+            aws cloudformation validate-template \
+              --template-body file://${template} \
+              --region ${{ secrets.AWS_REGION }} \
+              --output text > /dev/null
+            echo "  ✓ ${template}"
+          done
+
+          echo "Validating master template..."
+          aws cloudformation validate-template \
+            --template-body file://master.yaml \
+            --region ${{ secrets.AWS_REGION }} \
+            --output text > /dev/null
+          echo "  ✓ master.yaml"
+
+  # ── Deploy: only runs on master after validate passes ─────────────────────────
+  deploy:
+    name: Upload Templates and Deploy Stack
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout infrastructure code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: github-actions-cfn-deploy
+
+      - name: Create templates bucket if not exists
+        run: |
+          BUCKET="${{ secrets.TEMPLATES_BUCKET }}"
+          REGION="${{ secrets.AWS_REGION }}"
+
+          if ! aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+            echo "Creating bucket: s3://${BUCKET}"
+            aws s3api create-bucket \
+              --bucket "${BUCKET}" \
+              --region "${REGION}" \
+              --create-bucket-configuration LocationConstraint="${REGION}"
+
+            aws s3api put-bucket-versioning \
+              --bucket "${BUCKET}" \
+              --versioning-configuration Status=Enabled
+
+            aws s3api put-public-access-block \
+              --bucket "${BUCKET}" \
+              --public-access-block-configuration \
+                BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+            echo "Bucket created."
+          else
+            echo "Bucket already exists: s3://${BUCKET}"
+          fi
+
+      - name: Upload nested stack templates to S3
+        run: |
+          BUCKET="${{ secrets.TEMPLATES_BUCKET }}"
+          REGION="${{ secrets.AWS_REGION }}"
+
+          echo "Uploading templates to s3://${BUCKET}/${TEMPLATES_PREFIX}/"
+          for template in stacks/*.yaml; do
+            echo "  ↑ $(basename ${template})"
+            aws s3 cp "${template}" \
+              "s3://${BUCKET}/${TEMPLATES_PREFIX}/$(basename ${template})" \
+              --region "${REGION}" \
+              --sse AES256
+          done
+          echo "All templates uploaded."
+
+      - name: Deploy master CloudFormation stack
+        run: |
+          aws cloudformation deploy \
+            --template-file master.yaml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              GithubOrg=${{ github.repository_owner }} \
+              GithubRepo=ecs-cicd-app \
+              TemplatesBucket=${{ secrets.TEMPLATES_BUCKET }} \
+            --no-fail-on-empty-changeset
+
+      - name: Print stack outputs
+        if: success()
+        run: |
+          echo "Stack outputs:"
+          aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'Stacks[0].Outputs' \
+            --output table
