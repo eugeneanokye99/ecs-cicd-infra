@@ -96,18 +96,13 @@ jobs:
 
       - name: Upload nested stack templates to S3
         run: |
-          BUCKET="${{ secrets.TEMPLATES_BUCKET }}"
-          REGION="${{ secrets.AWS_REGION }}"
-
-          echo "Uploading templates to s3://${BUCKET}/${TEMPLATES_PREFIX}/"
-          for template in stacks/*.yaml; do
-            echo "  ↑ $(basename ${template})"
-            aws s3 cp "${template}" \
-              "s3://${BUCKET}/${TEMPLATES_PREFIX}/$(basename ${template})" \
-              --region "${REGION}" \
-              --sse AES256
-          done
-          echo "All templates uploaded."
+          aws s3 sync stacks/ \
+            s3://${{ secrets.TEMPLATES_BUCKET }}/${{ env.TEMPLATES_PREFIX }}/ \
+            --region ${{ secrets.AWS_REGION }} \
+            --sse AES256 \
+            --delete \
+            --exclude "*" \
+            --include "*.yaml"
 
       - name: Deploy master CloudFormation stack
         run: |
