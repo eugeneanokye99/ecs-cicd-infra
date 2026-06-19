@@ -8,7 +8,7 @@ stack-name: ecs-cicd-master
 region: eu-central-1
 
 parameters:
-  GithubOrg: YOUR_GITHUB_USERNAME
+  GithubOrg: eugeneanokye99
   GithubRepo: ecs-cicd-app
   TemplatesBucket: YOUR_TEMPLATES_BUCKET_NAME
 
