@@ -1,20 +1,3 @@
-# CloudFormation GitSync Deployment Configuration
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/git-sync-concepts-terms.html
-
-template-file-path: ./master.yaml
-
-stack-name: ecs-cicd-master
-
-region: eu-central-1
-
-parameters:
-  GithubOrg: eugeneanokye99
-  GithubRepo: ecs-cicd-app
-  TemplatesBucket: ecs-cloudformation-infra
-  TemplatesPrefix: templates
-
-tags:
-  Project: ecs-cicd
-  Environment: prod
-  Owner: EugeneAnokye
-  ManagedBy: CloudFormation-GitSync
+template-file-path: master.yaml
+parameters: {}
+tags: {}
