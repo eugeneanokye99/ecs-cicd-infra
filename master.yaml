@@ -26,7 +26,7 @@ Parameters:
 
   TemplatesBucket:
     Type: String
-    Default: bem13-cloudformation-infra
+    Default: ecs-cloudformation-infra-120569613427
     Description: S3 bucket where nested stack templates are stored
 
   TemplatesPrefix:
