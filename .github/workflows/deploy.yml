@@ -25,8 +25,11 @@ jobs:
 
       - name: Create S3 bucket if not exists
         run: |
-          BUCKET=bem13-cloudformation-infra
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          BUCKET="bem13-cloudformation-infra-${ACCOUNT_ID}"
           REGION=${{ secrets.AWS_REGION }}
+
+          echo "BUCKET=${BUCKET}" >> $GITHUB_ENV
 
           if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
             aws s3api create-bucket \
@@ -50,4 +53,4 @@ jobs:
 
       - name: Sync Templates to S3
         run: |
-          aws s3 sync templates s3://bem13-cloudformation-infra/templates --delete
+          aws s3 sync templates s3://${{ env.BUCKET }}/templates --delete
