@@ -191,6 +191,16 @@ Resources:
 
 
 
+  # ── GitHub OIDC Provider ─────────────────────────────────────────────────────
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
   # ── GitHub OIDC Role ──────────────────────────────────────────────────────────
   GitHubOIDCRole:
     Type: AWS::IAM::Role
