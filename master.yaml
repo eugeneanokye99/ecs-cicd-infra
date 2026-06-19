@@ -31,7 +31,7 @@ Parameters:
 
   TemplatesPrefix:
     Type: String
-    Default: prod/templates
+    Default: templates
     Description: S3 key prefix for nested template files
 
 Resources:

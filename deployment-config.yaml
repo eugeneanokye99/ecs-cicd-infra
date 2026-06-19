@@ -11,7 +11,7 @@ parameters:
   GithubOrg: eugeneanokye99
   GithubRepo: ecs-cicd-app
   TemplatesBucket: bem13-cloudformation-infra
-  TemplatesPrefix: prod/templates
+  TemplatesPrefix: templates
 
 tags:
   Project: ecs-cicd
