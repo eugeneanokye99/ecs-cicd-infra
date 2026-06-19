@@ -26,13 +26,12 @@ Parameters:
 
   TemplatesBucket:
     Type: String
-    Description: |
-      S3 bucket where nested stack templates are stored.
-      Run scripts/upload-templates.sh to populate this bucket before deploying.
+    Default: bem13-cloudformation-infra
+    Description: S3 bucket where nested stack templates are stored
 
   TemplatesPrefix:
     Type: String
-    Default: stacks
+    Default: prod/templates
     Description: S3 key prefix for nested template files
 
 Resources:

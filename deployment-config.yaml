@@ -10,7 +10,8 @@ region: eu-central-1
 parameters:
   GithubOrg: eugeneanokye99
   GithubRepo: ecs-cicd-app
-  TemplatesBucket: YOUR_TEMPLATES_BUCKET_NAME
+  TemplatesBucket: bem13-cloudformation-infra
+  TemplatesPrefix: prod/templates
 
 tags:
   Project: ecs-cicd
