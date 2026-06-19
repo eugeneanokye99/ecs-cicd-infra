@@ -172,8 +172,8 @@
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::ecs-cloudformation-infra-120569613427",
-        "arn:aws:s3:::ecs-cloudformation-infra-120569613427/*"
+        "arn:aws:s3:::ecs-cloudformation-infra",
+        "arn:aws:s3:::ecs-cloudformation-infra/*"
       ]
     },
     {
