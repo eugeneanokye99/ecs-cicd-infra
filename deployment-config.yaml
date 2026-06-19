@@ -12,6 +12,7 @@ parameters:
   GithubRepo: ecs-cicd-app
   TemplatesBucket: ecs-cloudformation-infra
   TemplatesPrefix: templates
+  OIDCProviderArn: arn:aws:iam::120569613427:oidc-provider/token.actions.githubusercontent.com
 
 tags:
   Project: ecs-cicd

@@ -21,6 +21,9 @@ Parameters:
   LogGroupArn:
     Type: String
     Description: ARN of the CloudWatch Log Group
+  OIDCProviderArn:
+    Type: String
+    Description: ARN of the existing GitHub Actions OIDC provider in this account
 
 Resources:
   # ── ECS Task Execution Role ───────────────────────────────────────────────────
@@ -191,16 +194,6 @@ Resources:
 
 
 
-  # ── GitHub OIDC Provider ─────────────────────────────────────────────────────
-  GitHubOIDCProvider:
-    Type: AWS::IAM::OIDCProvider
-    Properties:
-      Url: https://token.actions.githubusercontent.com
-      ClientIdList:
-        - sts.amazonaws.com
-      ThumbprintList:
-        - 6938fd4d98bab03faadb97b34396831e3780aea1
-
   # ── GitHub OIDC Role ──────────────────────────────────────────────────────────
   GitHubOIDCRole:
     Type: AWS::IAM::Role
@@ -211,7 +204,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !GetAtt GitHubOIDCProvider.Arn
+              Federated: !Ref OIDCProviderArn
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:

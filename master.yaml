@@ -34,6 +34,10 @@ Parameters:
     Default: templates
     Description: S3 key prefix for nested template files
 
+  OIDCProviderArn:
+    Type: String
+    Description: ARN of the existing GitHub Actions OIDC provider (arn:aws:iam::ACCOUNT:oidc-provider/token.actions.githubusercontent.com)
+
 Resources:
   # ── Phase 1: Network ──────────────────────────────────────────────────────────
   NetworkStack:
@@ -129,6 +133,7 @@ Resources:
         GithubRepo: !Ref GithubRepo
         ECRRepositoryArn: !GetAtt ECRStack.Outputs.RepositoryArn
         LogGroupArn: !GetAtt LoggingStack.Outputs.LogGroupArn
+        OIDCProviderArn: !Ref OIDCProviderArn
       Tags:
         - Key: Project
           Value: !Ref ProjectName
