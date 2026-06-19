@@ -23,6 +23,31 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Create S3 bucket if not exists
+        run: |
+          BUCKET=bem13-cloudformation-infra
+          REGION=${{ secrets.AWS_REGION }}
+
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3api create-bucket \
+              --bucket "$BUCKET" \
+              --region "$REGION" \
+              --create-bucket-configuration LocationConstraint="$REGION"
+
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+
+            aws s3api put-public-access-block \
+              --bucket "$BUCKET" \
+              --public-access-block-configuration \
+                BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+            echo "Bucket created: s3://$BUCKET"
+          else
+            echo "Bucket already exists: s3://$BUCKET"
+          fi
+
       - name: Sync Templates to S3
         run: |
           aws s3 sync templates s3://bem13-cloudformation-infra/templates --delete
