@@ -18,6 +18,7 @@
         "ec2:ModifyVpcAttribute",
         "ec2:CreateSubnet",
         "ec2:DeleteSubnet",
+        "ec2:ModifySubnetAttribute",
         "ec2:CreateRouteTable",
         "ec2:DeleteRouteTable",
         "ec2:CreateRoute",
@@ -159,8 +160,13 @@
         "logs:CreateLogGroup",
         "logs:DeleteLogGroup",
         "logs:PutRetentionPolicy",
+        "logs:TagLogGroup",
+        "logs:UntagLogGroup",
+        "logs:TagResource",
+        "logs:UntagResource",
         "logs:Describe*",
-        "logs:ListTagsLogGroup"
+        "logs:ListTagsLogGroup",
+        "logs:ListTagsForResource"
       ],
       "Resource": "*"
     },
