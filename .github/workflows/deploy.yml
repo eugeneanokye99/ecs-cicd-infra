@@ -23,34 +23,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Create S3 bucket if not exists
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          BUCKET="bem13-cloudformation-infra-${ACCOUNT_ID}"
-          REGION=${{ secrets.AWS_REGION }}
-
-          echo "BUCKET=${BUCKET}" >> $GITHUB_ENV
-
-          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            aws s3api create-bucket \
-              --bucket "$BUCKET" \
-              --region "$REGION" \
-              --create-bucket-configuration LocationConstraint="$REGION"
-
-            aws s3api put-bucket-versioning \
-              --bucket "$BUCKET" \
-              --versioning-configuration Status=Enabled
-
-            aws s3api put-public-access-block \
-              --bucket "$BUCKET" \
-              --public-access-block-configuration \
-                BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-
-            echo "Bucket created: s3://$BUCKET"
-          else
-            echo "Bucket already exists: s3://$BUCKET"
-          fi
-
       - name: Sync Templates to S3
         run: |
-          aws s3 sync templates s3://${{ env.BUCKET }}/templates --delete
+          aws s3 sync templates s3://${{ secrets.TEMPLATES_BUCKET }}/templates --delete
