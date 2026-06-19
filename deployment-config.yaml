@@ -3,7 +3,7 @@
 
 template-file-path: ./master.yaml
 
-stack-name: ecs-cicd-master
+stack-name: ecs-cicd-stack
 
 region: eu-central-1
 
