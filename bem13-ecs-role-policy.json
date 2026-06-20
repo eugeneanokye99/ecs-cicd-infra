@@ -123,6 +123,8 @@
         "codedeploy:CreateDeploymentGroup",
         "codedeploy:UpdateDeploymentGroup",
         "codedeploy:DeleteDeploymentGroup",
+        "codedeploy:TagResource",
+        "codedeploy:UntagResource",
         "codedeploy:Get*",
         "codedeploy:List*"
       ],
@@ -200,7 +202,11 @@
         "s3:DeleteBucketPolicy",
         "s3:GetBucketPolicy",
         "s3:GetBucketLocation",
-        "s3:ListBucket"
+        "s3:ListBucket",
+        "s3:PutBucketTagging",
+        "s3:GetBucketTagging",
+        "s3:TagResource",
+        "s3:UntagResource"
       ],
       "Resource": "*"
     },

@@ -12,7 +12,7 @@ Parameters:
 Resources:
   ECSLogGroup:
     Type: AWS::Logs::LogGroup
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       LogGroupName: !Sub /ecs/${ProjectName}
       RetentionInDays: 30

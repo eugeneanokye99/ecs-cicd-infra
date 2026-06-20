@@ -33,7 +33,7 @@ Resources:
   # ── S3 Artifact Bucket ────────────────────────────────────────────────────────
   ArtifactBucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
+    DeletionPolicy: Delete
     Properties:
       BucketName: !Sub ${ProjectName}-artifacts-${AWS::AccountId}
       VersioningConfiguration:
