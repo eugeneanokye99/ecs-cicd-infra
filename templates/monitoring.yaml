@@ -163,6 +163,7 @@ Resources:
               "x": 0, "y": 0, "width": 12, "height": 6,
               "properties": {
                 "title": "ECS CPU Utilization",
+                "region": "${AWS::Region}",
                 "metrics": [
                   ["AWS/ECS", "CPUUtilization", "ClusterName", "${ECSClusterName}", "ServiceName", "${ECSServiceName}"]
                 ],
@@ -176,6 +177,7 @@ Resources:
               "x": 12, "y": 0, "width": 12, "height": 6,
               "properties": {
                 "title": "ECS Memory Utilization",
+                "region": "${AWS::Region}",
                 "metrics": [
                   ["AWS/ECS", "MemoryUtilization", "ClusterName", "${ECSClusterName}", "ServiceName", "${ECSServiceName}"]
                 ],
@@ -189,6 +191,7 @@ Resources:
               "x": 0, "y": 6, "width": 12, "height": 6,
               "properties": {
                 "title": "ALB Request Count",
+                "region": "${AWS::Region}",
                 "metrics": [
                   ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${ALBFullName}"]
                 ],
@@ -202,6 +205,7 @@ Resources:
               "x": 12, "y": 6, "width": 12, "height": 6,
               "properties": {
                 "title": "ALB HTTP 5xx Errors",
+                "region": "${AWS::Region}",
                 "metrics": [
                   ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", "${ALBFullName}"]
                 ],
