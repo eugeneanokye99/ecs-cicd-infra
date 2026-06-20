@@ -246,6 +246,11 @@ Resources:
                 Action:
                   - cloudformation:DescribeStacks
                 Resource: '*'
+              - Sid: IAMGetRole
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-task-execution-role
               - Sid: ECSDescribeForTaskDef
                 Effect: Allow
                 Action:
