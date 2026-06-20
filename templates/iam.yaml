@@ -234,6 +234,11 @@ Resources:
                   - ecr:PutImage
                   - ecr:DescribeImages
                 Resource: !Ref ECRRepositoryArn
+              - Sid: S3ArtifactBucketList
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub arn:aws:s3:::${ProjectName}-artifacts-${AWS::AccountId}
               - Sid: S3DeployBundleUpload
                 Effect: Allow
                 Action:
