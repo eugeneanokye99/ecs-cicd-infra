@@ -101,8 +101,8 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                # Restrict to the master branch only
-                token.actions.githubusercontent.com:sub: !Sub repo:${GithubOrg}/${GithubRepo}:ref:refs/heads/master
+                # Restrict to the main branch only
+                token.actions.githubusercontent.com:sub: !Sub repo:${GithubOrg}/${GithubRepo}:ref:refs/heads/main
       Policies:
         - PolicyName: SyncTemplatesToS3
           PolicyDocument:
