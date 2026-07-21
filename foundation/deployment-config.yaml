@@ -1,7 +1,7 @@
 # CloudFormation GitSync Deployment Configuration
 # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/git-sync-concepts-terms.html
 
-template-file-path: ./foundation.yaml
+template-file-path: foundation/foundation.yaml
 
 stack-name: ecs-cicd-stack
 
@@ -11,8 +11,6 @@ parameters:
   GithubOrg: eugeneanokye99
   GithubRepo: ecs-cicd-app
   TemplatesBucket: ecs-cloudformation-infra
-  TemplatesPrefix: templates
-  OIDCProviderArn: arn:aws:iam::120569613427:oidc-provider/token.actions.githubusercontent.com
 
 tags:
   Project: ecs-cicd
