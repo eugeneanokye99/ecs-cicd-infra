@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Foundation stack - account-level, one-time resources for the ECS CI/CD lab.
+  Creates the ECR repository, the GitHub Actions OIDC provider, and the OIDC
+  role assumed by this infra repo's pipeline (.github/workflows/deploy.yml) to
+  sync CloudFormation templates to S3. Deploy this once per account/region
+  before the master stack.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: ecs-cicd
+  Environment:
+    Type: String
+    Default: prod
+  GithubOrg:
+    Type: String
+    Description: GitHub organization or username that owns the infra repository
+  GithubRepo:
+    Type: String
+    Default: ecs-cicd-infra
+    Description: GitHub infra repository name (this repo, whose pipeline syncs templates to S3)
+  TemplatesBucket:
+    Type: String
+    Default: ecs-cloudformation-infra
+    Description: S3 bucket where nested stack templates are synced/stored
+
+Resources:
+  # ── ECR Repository ────────────────────────────────────────────────────────────
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub ${ProjectName}-app
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Remove untagged images after 1 day",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 10
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-app
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+  # ── GitHub Actions OIDC Provider ──────────────────────────────────────────────
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        # GitHub's OIDC token endpoint intermediate CA thumbprint (root CA thumbprint fallback)
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-github-oidc-provider
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+  # ── GitHub OIDC Role for this infra repo's pipeline ───────────────────────────
+  # Assumed by .github/workflows/deploy.yml (role-to-assume: secrets.AWS_ROLE_ARN)
+  # to sync CloudFormation templates to the TemplatesBucket
+  PipelineGitHubOIDCRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-infra-pipeline-oidc-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                # Allow any branch/tag/PR from the specified repo
+                token.actions.githubusercontent.com:sub: !Sub repo:${GithubOrg}/${GithubRepo}:*
+      Policies:
+        - PolicyName: SyncTemplatesToS3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListBucket
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub arn:aws:s3:::${TemplatesBucket}
+              - Sid: SyncObjects
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource: !Sub arn:aws:s3:::${TemplatesBucket}/templates/*
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: EugeneAnokye
+
+Outputs:
+  RepositoryUri:
+    Value: !GetAtt ECRRepository.RepositoryUri
+    Export:
+      Name: !Sub ${ProjectName}-ECRRepositoryUri
+
+  RepositoryName:
+    Value: !Ref ECRRepository
+    Export:
+      Name: !Sub ${ProjectName}-ECRRepositoryName
+
+  RepositoryArn:
+    Value: !GetAtt ECRRepository.Arn
+    Export:
+      Name: !Sub ${ProjectName}-ECRRepositoryArn
+
+  OIDCProviderArn:
+    Description: ARN of the GitHub Actions OIDC provider - pass this to master.yaml's OIDCProviderArn parameter
+    Value: !Ref GitHubOIDCProvider
+    Export:
+      Name: !Sub ${ProjectName}-GitHubOIDCProviderArn
+
+  PipelineGitHubOIDCRoleArn:
+    Description: Role ARN to set as AWS_ROLE_ARN secret in this infra repo's GitHub Actions
+    Value: !GetAtt PipelineGitHubOIDCRole.Arn
+    Export:
+      Name: !Sub ${ProjectName}-PipelineGitHubOIDCRoleArn
