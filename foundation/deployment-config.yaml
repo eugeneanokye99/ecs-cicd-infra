@@ -9,7 +9,7 @@ region: eu-central-1
 
 parameters:
   GithubOrg: eugeneanokye99
-  GithubRepo: ecs-cicd-app
+  GithubRepo: ecs-cicd-infra
   TemplatesBucket: ecs-cloudformation-infra
 
 tags:
