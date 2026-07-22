@@ -13,6 +13,10 @@ parameters:
   TemplatesBucket: ecs-cloudformation-infra
   TemplatesPrefix: templates
   OIDCProviderArn: arn:aws:iam::120569613427:oidc-provider/token.actions.githubusercontent.com
+  # Copy these three from the ecs-cicd-foundation stack's Outputs tab
+  ECRRepositoryUri: 120569613427.dkr.ecr.eu-central-1.amazonaws.com/ecs-cicd-app
+  ECRRepositoryName: ecs-cicd-app
+  ECRRepositoryArn: arn:aws:ecr:eu-central-1:120569613427:repository/ecs-cicd-app
 
 tags:
   Project: ecs-cicd

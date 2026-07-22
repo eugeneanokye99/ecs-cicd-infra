@@ -1,7 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: |
   Master stack for ECS CI/CD lab — Eugene Anokye.
-  Orchestrates all nested stacks: Network, Security, ECR, Logging, IAM, ECS, Pipeline, Monitoring.
+  Orchestrates all nested stacks: Network, Security, Logging, IAM, ECS, Pipeline, Monitoring.
+  The ECR repository is created once by the foundation stack (foundation/foundation.yaml);
+  its outputs are passed in here as parameters rather than recreated as a nested stack.
 
 Parameters:
   ProjectName:
@@ -37,6 +39,18 @@ Parameters:
   OIDCProviderArn:
     Type: String
     Description: ARN of the existing GitHub Actions OIDC provider (arn:aws:iam::ACCOUNT:oidc-provider/token.actions.githubusercontent.com)
+
+  ECRRepositoryUri:
+    Type: String
+    Description: URI of the ECR repository created by the foundation stack (foundation.yaml Outputs.RepositoryUri)
+
+  ECRRepositoryName:
+    Type: String
+    Description: Name of the ECR repository created by the foundation stack (foundation.yaml Outputs.RepositoryName)
+
+  ECRRepositoryArn:
+    Type: String
+    Description: ARN of the ECR repository created by the foundation stack (foundation.yaml Outputs.RepositoryArn)
 
 Resources:
   # ── Phase 1: Network ──────────────────────────────────────────────────────────
@@ -79,25 +93,6 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  # ── Phase 3: ECR ──────────────────────────────────────────────────────────────
-  ECRStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/ecr.yaml
-      TimeoutInMinutes: 10
-      Parameters:
-        ProjectName: !Ref ProjectName
-        Environment: !Ref Environment
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-        - Key: ManagedBy
-          Value: CloudFormation
-
   # ── Phase 4: Logging ──────────────────────────────────────────────────────────
   LoggingStack:
     Type: AWS::CloudFormation::Stack
@@ -121,7 +116,6 @@ Resources:
   IAMStack:
     Type: AWS::CloudFormation::Stack
     DependsOn:
-      - ECRStack
       - LoggingStack
     Properties:
       TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/iam.yaml
@@ -131,7 +125,7 @@ Resources:
         Environment: !Ref Environment
         GithubOrg: !Ref GithubOrg
         GithubRepo: !Ref GithubRepo
-        ECRRepositoryArn: !GetAtt ECRStack.Outputs.RepositoryArn
+        ECRRepositoryArn: !Ref ECRRepositoryArn
         LogGroupArn: !GetAtt LoggingStack.Outputs.LogGroupArn
         OIDCProviderArn: !Ref OIDCProviderArn
       Tags:
@@ -167,7 +161,7 @@ Resources:
         ECSSecurityGroupId: !GetAtt SecurityStack.Outputs.ECSSecurityGroupId
         TaskExecutionRoleArn: !GetAtt IAMStack.Outputs.TaskExecutionRoleArn
         LogGroupName: !GetAtt LoggingStack.Outputs.LogGroupName
-        ECRRepositoryUri: !GetAtt ECRStack.Outputs.RepositoryUri
+        ECRRepositoryUri: !Ref ECRRepositoryUri
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -184,14 +178,13 @@ Resources:
     DependsOn:
       - ECSStack
       - IAMStack
-      - ECRStack
     Properties:
       TemplateURL: !Sub https://s3.${AWS::Region}.amazonaws.com/${TemplatesBucket}/${TemplatesPrefix}/pipeline.yaml
       TimeoutInMinutes: 20
       Parameters:
         ProjectName: !Ref ProjectName
         Environment: !Ref Environment
-        ECRRepositoryName: !GetAtt ECRStack.Outputs.RepositoryName
+        ECRRepositoryName: !Ref ECRRepositoryName
         ECSClusterName: !GetAtt ECSStack.Outputs.ClusterName
         ECSServiceName: !GetAtt ECSStack.Outputs.ServiceName
         ALBListenerArn: !GetAtt ECSStack.Outputs.ALBListenerArn
@@ -244,7 +237,7 @@ Outputs:
 
   ECRRepositoryUri:
     Description: ECR Repository URI — use this when pushing images
-    Value: !GetAtt ECRStack.Outputs.RepositoryUri
+    Value: !Ref ECRRepositoryUri
 
   GitHubOIDCRoleArn:
     Description: Role ARN to set as AWS_ROLE_ARN in GitHub Actions secrets
