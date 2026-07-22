@@ -17,6 +17,10 @@ parameters:
   ECRRepositoryUri: 120569613427.dkr.ecr.eu-central-1.amazonaws.com/ecs-cicd-app
   ECRRepositoryName: ecs-cicd-app
   ECRRepositoryArn: arn:aws:ecr:eu-central-1:120569613427:repository/ecs-cicd-app
+  # Bootstrap at 0/0 so ECS can create without a pre-existing image.
+  # Once a real image has been pushed to ECR, bump both to 1 and commit.
+  DesiredCount: 0
+  MinCapacity: 0
 
 tags:
   Project: ecs-cicd

@@ -52,6 +52,16 @@ Parameters:
     Type: String
     Description: ARN of the ECR repository created by the foundation stack (foundation.yaml Outputs.RepositoryArn)
 
+  DesiredCount:
+    Type: Number
+    Default: 0
+    Description: Initial ECS task count. Keep at 0 until a real image has been pushed to ECR, then redeploy with 1.
+
+  MinCapacity:
+    Type: Number
+    Default: 0
+    Description: ECS auto scaling floor. Keep at 0 alongside DesiredCount until a real image exists.
+
 Resources:
   # ── Phase 1: Network ──────────────────────────────────────────────────────────
   NetworkStack:
@@ -162,6 +172,8 @@ Resources:
         TaskExecutionRoleArn: !GetAtt IAMStack.Outputs.TaskExecutionRoleArn
         LogGroupName: !GetAtt LoggingStack.Outputs.LogGroupName
         ECRRepositoryUri: !Ref ECRRepositoryUri
+        DesiredCount: !Ref DesiredCount
+        MinCapacity: !Ref MinCapacity
       Tags:
         - Key: Project
           Value: !Ref ProjectName
