@@ -32,6 +32,7 @@ Resources:
     Properties:
       RepositoryName: !Sub ${ProjectName}-app
       ImageTagMutability: MUTABLE
+      EmptyOnDelete: true
       ImageScanningConfiguration:
         ScanOnPush: true
       EncryptionConfiguration:
