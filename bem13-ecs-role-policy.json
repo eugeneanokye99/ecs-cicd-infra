@@ -248,7 +248,9 @@
         "iam:DeleteOpenIDConnectProvider",
         "iam:GetOpenIDConnectProvider",
         "iam:UpdateOpenIDConnectProviderThumbprint",
-        "iam:TagOpenIDConnectProvider"
+        "iam:TagOpenIDConnectProvider",
+        "iam:UntagOpenIDConnectProvider",
+        "iam:ListOpenIDConnectProviderTags"
       ],
       "Resource": "*"
     },
