@@ -237,6 +237,7 @@
       "Action": "iam:PassRole",
       "Resource": [
         "arn:aws:iam::120569613427:role/ecs-cicd-*",
+        "arn:aws:iam::120569613427:role/prod-bem13-*",
         "arn:aws:iam::120569613427:role/bem13-ecs-role"
       ]
     },
