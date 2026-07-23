@@ -16,6 +16,9 @@ parameters:
   TaskCpu: 1024
   TaskMemory: 2048
   BlueTerminationWaitMinutes: 10
+  OIDCProviderArn: arn:aws:iam::120569613427:oidc-provider/token.actions.githubusercontent.com
+  GithubOrg: eugeneanokye99
+  GithubAppRepo: ecs-cicd-app
 tags:
   Environment: prod
   Project: bem13-ecs-cicd

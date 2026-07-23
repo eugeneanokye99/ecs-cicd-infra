@@ -13,6 +13,16 @@ Parameters:
     AllowedValues: [true, false]
     Default: 'true'
     Description: Set to false if AWSServiceRoleForApplicationAutoScaling_ECSService already exists in this account
+  OIDCProviderArn:
+    Type: String
+    Description: ARN of the GitHub Actions OIDC provider, created by the foundation stack (foundation.yaml Outputs.OIDCProviderArn)
+  GithubOrg:
+    Type: String
+    Description: GitHub organization or username that owns the application repository
+  GithubAppRepo:
+    Type: String
+    Default: ecs-cicd-app
+    Description: GitHub application repository name (pushes images and deploy bundles)
 
 
 Resources:
@@ -217,6 +227,66 @@ Resources:
 
 
 
+  # ── GitHub OIDC Role for the application repo's pipeline ─────
+  # Assumed by ecs-cicd-app's build.yml (role-to-assume: secrets.AWS_ROLE_ARN)
+  # to push images to ECR, read SSM outputs, and upload the deploy bundle.
+  AppGitHubOIDCRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Environment}-${ProjectName}-app-github-oidc-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref OIDCProviderArn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # Restrict to the master branch only
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GithubOrg}/${GithubAppRepo}:ref:refs/heads/master"
+      Policies:
+        - PolicyName: push-image-and-deploy-bundle
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EcrAuth
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: EcrPush
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - ecr:BatchGetImage
+                Resource: !Sub "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${ProjectName}-app"
+              - Sid: SsmOutputsRead
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/${Environment}/*"
+              - Sid: ArtifactBucketWrite
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub "arn:aws:s3:::${AWS::AccountId}-${AWS::Region}-${Environment}-${ProjectName}-artifacts/*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-app-github-oidc-role"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
 Outputs:
   EcsTaskExecutionRoleArn:
     Value: !GetAtt EcsTaskExecutionRole.Arn
@@ -242,3 +312,9 @@ Outputs:
     Value: !GetAtt EventBridgeRole.Arn
     Export:
       Name: !Sub "${Environment}-${ProjectName}-EventBridgeRoleArn"
+
+  AppGitHubOIDCRoleArn:
+    Description: Role ARN to set as AWS_ROLE_ARN secret in ecs-cicd-app's GitHub Actions
+    Value: !GetAtt AppGitHubOIDCRole.Arn
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-AppGitHubOIDCRoleArn"

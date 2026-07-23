@@ -80,7 +80,7 @@ Resources:
           result:
             - SUCCESS
           repository-name:
-            - !Sub "${ProjectName}-java-app"
+            - !Sub "${ProjectName}-app"
           image-tag:
             - latest
       State: ENABLED
@@ -148,6 +148,8 @@ Resources:
                 TaskDefinitionTemplatePath: taskdef.json
                 AppSpecTemplateArtifact: DeployArtifacts
                 AppSpecTemplatePath: appspec.yaml
+                Image1ArtifactName: DeployArtifacts
+                Image1ContainerName: app
               InputArtifacts:
                 - Name: DeployArtifacts
               RunOrder: 1

@@ -153,7 +153,9 @@
         "events:PutTargets",
         "events:RemoveTargets",
         "events:DescribeRule",
-        "events:List*"
+        "events:List*",
+        "events:TagResource",
+        "events:UntagResource"
       ],
       "Resource": "*"
     },
@@ -269,6 +271,20 @@
           ]
         }
       }
+    },
+    {
+      "Sid": "SsmParameterStore",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:PutParameter",
+        "ssm:DeleteParameter",
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:AddTagsToResource",
+        "ssm:RemoveTagsFromResource",
+        "ssm:ListTagsForResource"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "CloudWatchMonitoring",

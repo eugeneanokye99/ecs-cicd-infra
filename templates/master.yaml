@@ -41,6 +41,17 @@ Parameters:
     Type: Number
     Default: 5
 
+  OIDCProviderArn:
+    Type: String
+    Description: ARN of the GitHub Actions OIDC provider, created by the foundation stack (foundation.yaml Outputs.OIDCProviderArn)
+  GithubOrg:
+    Type: String
+    Description: GitHub organization or username that owns the application repository
+  GithubAppRepo:
+    Type: String
+    Default: ecs-cicd-app
+    Description: GitHub application repository name (pushes images and deploy bundles)
+
 Resources:
 
   # ── 01: Network ────────────────────────────────────────────────
@@ -89,6 +100,9 @@ Resources:
       Parameters:
         Environment: !Ref Environment
         ProjectName: !Ref ProjectName
+        OIDCProviderArn: !Ref OIDCProviderArn
+        GithubOrg: !Ref GithubOrg
+        GithubAppRepo: !Ref GithubAppRepo
       Tags:
         - Key: Environment
           Value: !Ref Environment

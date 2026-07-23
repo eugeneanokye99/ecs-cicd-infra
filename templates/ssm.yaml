@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: BEM13 ECS CICD | Stack 9 of 8 — SSM Parameter Store outputs registry
+
+# Publishes stable, cross-repo-readable values under /<ProjectName>/<Environment>/*
+# so the application repo's CI/CD (ecs-cicd-app) can resolve infra details via
+# `aws ssm get-parameter` instead of hardcoding or querying stack names directly.
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, test, prod]
+  ProjectName:
+    Type: String
+    Default: bem13
+
+Resources:
+
+  ArtifactBucketNameParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/artifact-bucket-name"
+      Type: String
+      Value:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-ArtifactsBucket"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        ManagedBy: CloudFormation-GitSync
+
+  EcrRepositoryUriParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/ecr-repository-uri"
+      Type: String
+      Value:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-RepositoryUri"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        ManagedBy: CloudFormation-GitSync
+
+  ClusterNameParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/cluster-name"
+      Type: String
+      Value:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-ClusterName"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        ManagedBy: CloudFormation-GitSync
+
+  ServiceNameParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/service-name"
+      Type: String
+      Value:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-ServiceName"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        ManagedBy: CloudFormation-GitSync
+
+  TaskExecutionRoleArnParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/task-execution-role-arn"
+      Type: String
+      Value:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-EcsTaskExecutionRoleArn"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        ManagedBy: CloudFormation-GitSync
+
+  TaskRoleArnParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/task-role-arn"
+      Type: String
+      Value:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-EcsTaskRoleArn"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        ManagedBy: CloudFormation-GitSync
+
+  AlbDnsNameParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${ProjectName}/${Environment}/alb-dns-name"
+      Type: String
+      Value:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-AlbDnsName"
+      Tags:
+        Environment: !Ref Environment
+        Project: !Ref ProjectName
+        ManagedBy: CloudFormation-GitSync
+
+Outputs:
+  ParameterPathPrefix:
+    Description: SSM Parameter Store path prefix consumed by ecs-cicd-app's CI/CD
+    Value: !Sub "/${ProjectName}/${Environment}"
