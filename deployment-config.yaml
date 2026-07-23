@@ -1,29 +1,22 @@
-# CloudFormation GitSync Deployment Configuration
-# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/git-sync-concepts-terms.html
-
-template-file-path: ./master.yaml
-
-stack-name: ecs-cicd-stack
-
+template-file-path: templates/master.yaml
+stack-name: prod-bem13-master
 region: eu-central-1
-
+capabilities:
+  - CAPABILITY_IAM
+  - CAPABILITY_NAMED_IAM
 parameters:
-  GithubOrg: eugeneanokye99
-  GithubRepo: ecs-cicd-app
-  TemplatesBucket: ecs-cloudformation-infra
-  TemplatesPrefix: templates
-  OIDCProviderArn: arn:aws:iam::120569613427:oidc-provider/token.actions.githubusercontent.com
-  # Copy these three from the ecs-cicd-foundation stack's Outputs tab
-  ECRRepositoryUri: 120569613427.dkr.ecr.eu-central-1.amazonaws.com/ecs-cicd-app
-  ECRRepositoryName: ecs-cicd-app
-  ECRRepositoryArn: arn:aws:ecr:eu-central-1:120569613427:repository/ecs-cicd-app
-  # Bootstrap at 0/0 so ECS can create without a pre-existing image.
-  # Once a real image has been pushed to ECR, bump both to 1 and commit.
-  DesiredCount: 0
-  MinCapacity: 0
-
-tags:
-  Project: ecs-cicd
   Environment: prod
-  Owner: EugeneAnokye
+  ProjectName: bem13
+  TemplateBaseUrl: https://ecs-cloudformation-infra.s3.eu-central-1.amazonaws.com/templates
+  AppPort: 8080
+  DesiredCount: 0
+  MinCapacity: 1
+  MaxCapacity: 4
+  CpuScaleOutThreshold: 70
+  TaskCpu: 1024
+  TaskMemory: 2048
+  BlueTerminationWaitMinutes: 10
+tags:
+  Environment: prod
+  Project: bem13-ecs-cicd
   ManagedBy: CloudFormation-GitSync

@@ -1,16 +1,21 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Network stack - VPC, subnets, IGW, NAT, route tables, and VPC endpoints
+Description: >
+  BEM13 ECS CICD | Stack 1 of 8 — VPC, subnets, IGW, routing.
+  Private subnets have no default route; all AWS-service traffic
+  (ECR, S3, CloudWatch) is handled exclusively by VPC endpoints
+  defined in endpoints.yaml.
 
 Parameters:
-  ProjectName:
-    Type: String
-    Default: ecs-cicd
   Environment:
     Type: String
-    Default: prod
+    AllowedValues: [dev, test, prod]
+  ProjectName:
+    Type: String
+    Default: bem13
 
 Resources:
-  # ── VPC ──────────────────────────────────────────────────────────────────────
+
+  # ── VPC ────────────────────────────────────────────────────────
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -19,334 +24,208 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-vpc
-        - Key: Project
-          Value: !Ref ProjectName
+          Value: !Sub "${Environment}-${ProjectName}-vpc"
         - Key: Environment
           Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-
-  # ── Subnets ───────────────────────────────────────────────────────────────────
-  PublicSubnetA:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-public-a
         - Key: Project
           Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-        - Key: Tier
-          Value: public
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
 
-  PublicSubnetB:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.2.0/24
-      AvailabilityZone: !Select [1, !GetAZs '']
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-public-b
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-        - Key: Tier
-          Value: public
-
-  PrivateSubnetA:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.11.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-private-a
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-        - Key: Tier
-          Value: private
-
-  PrivateSubnetB:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.12.0/24
-      AvailabilityZone: !Select [1, !GetAZs '']
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-private-b
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-        - Key: Tier
-          Value: private
-
-  # ── Internet Gateway ──────────────────────────────────────────────────────────
-  InternetGateway:
+  # ── Internet Gateway ───────────────────────────────────────────
+  # Used only by the ALB in public subnets; ECS tasks never reach it.
+  IGW:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-igw
-        - Key: Project
-          Value: !Ref ProjectName
+          Value: !Sub "${Environment}-${ProjectName}-igw"
         - Key: Environment
           Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
 
-  VPCGatewayAttachment:
+  IGWAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
+      InternetGatewayId: !Ref IGW
       VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
 
-  # ── NAT Gateway ───────────────────────────────────────────────────────────────
-  NatGatewayEIP:
-    Type: AWS::EC2::EIP
-    DependsOn: VPCGatewayAttachment
+  # ── Public Subnets (ALB) ───────────────────────────────────────
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
     Properties:
-      Domain: vpc
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-nat-eip
-        - Key: Project
-          Value: !Ref ProjectName
+          Value: !Sub "${Environment}-${ProjectName}-public-1"
+        - Key: Tier
+          Value: public
         - Key: Environment
           Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
 
-  NatGateway:
-    Type: AWS::EC2::NatGateway
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
     Properties:
-      SubnetId: !Ref PublicSubnetA
-      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-nat
-        - Key: Project
-          Value: !Ref ProjectName
+          Value: !Sub "${Environment}-${ProjectName}-public-2"
+        - Key: Tier
+          Value: public
         - Key: Environment
           Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
 
-  # ── Route Tables ──────────────────────────────────────────────────────────────
-  PublicRouteTable:
+  # ── Private Subnets (ECS Fargate tasks) ───────────────────────
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-private-1"
+        - Key: Tier
+          Value: private
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-private-2"
+        - Key: Tier
+          Value: private
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── Public Routing ─────────────────────────────────────────────
+  PublicRT:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-public-rt
-        - Key: Project
-          Value: !Ref ProjectName
+          Value: !Sub "${Environment}-${ProjectName}-public-rt"
         - Key: Environment
           Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
 
-  PublicDefaultRoute:
+  PublicRoute:
     Type: AWS::EC2::Route
-    DependsOn: VPCGatewayAttachment
+    DependsOn: IGWAttachment
     Properties:
-      RouteTableId: !Ref PublicRouteTable
+      RouteTableId: !Ref PublicRT
       DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
+      GatewayId: !Ref IGW
 
-  PublicSubnetARouteTableAssoc:
+  PublicSubnet1RTAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnetA
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRT
 
-  PublicSubnetBRouteTableAssoc:
+  PublicSubnet2RTAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnetB
-      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRT
 
-  PrivateRouteTableA:
+  # ── Private Routing ────────────────────────────────────────────
+  # No default route — outbound internet access is intentionally
+  # blocked. The S3 gateway endpoint (endpoints.yaml) injects its
+  # own prefix-list route into this table automatically.
+  PrivateRT:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-private-rt-a
-        - Key: Project
-          Value: !Ref ProjectName
+          Value: !Sub "${Environment}-${ProjectName}-private-rt"
         - Key: Environment
           Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
 
-  PrivateDefaultRouteA:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableA
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
-
-  PrivateSubnetARouteTableAssoc:
+  PrivateSubnet1RTAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnetA
-      RouteTableId: !Ref PrivateRouteTableA
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRT
 
-  PrivateRouteTableB:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-private-rt-b
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-
-  PrivateDefaultRouteB:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableB
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
-
-  PrivateSubnetBRouteTableAssoc:
+  PrivateSubnet2RTAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PrivateSubnetB
-      RouteTableId: !Ref PrivateRouteTableB
-
-  # ── VPC Endpoints ─────────────────────────────────────────────────────────────
-  # Security group for interface endpoints — allows HTTPS from within the VPC
-  VPCEndpointSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for VPC interface endpoints
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 10.0.0.0/16
-          Description: HTTPS from VPC CIDR
-      Tags:
-        - Key: Name
-          Value: !Sub ${ProjectName}-vpce-sg
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Owner
-          Value: EugeneAnokye
-
-  # ECR API interface endpoint (DescribeRepositories, GetAuthorizationToken, etc.)
-  ECRApiEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcId: !Ref VPC
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SubnetIds:
-        - !Ref PrivateSubnetA
-        - !Ref PrivateSubnetB
-      SecurityGroupIds:
-        - !Ref VPCEndpointSecurityGroup
-
-  # ECR Docker registry interface endpoint (image layer pulls)
-  ECRDkrEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcId: !Ref VPC
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SubnetIds:
-        - !Ref PrivateSubnetA
-        - !Ref PrivateSubnetB
-      SecurityGroupIds:
-        - !Ref VPCEndpointSecurityGroup
-
-  # S3 gateway endpoint — ECR image layers are stored in S3
-  S3GatewayEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcId: !Ref VPC
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
-      VpcEndpointType: Gateway
-      RouteTableIds:
-        - !Ref PrivateRouteTableA
-        - !Ref PrivateRouteTableB
-
-  # CloudWatch Logs interface endpoint — for ECS task log delivery
-  CloudWatchLogsEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcId: !Ref VPC
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SubnetIds:
-        - !Ref PrivateSubnetA
-        - !Ref PrivateSubnetB
-      SecurityGroupIds:
-        - !Ref VPCEndpointSecurityGroup
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRT
 
 Outputs:
   VpcId:
     Value: !Ref VPC
     Export:
-      Name: !Sub ${ProjectName}-VpcId
+      Name: !Sub "${Environment}-${ProjectName}-VpcId"
 
-  PublicSubnetA:
-    Value: !Ref PublicSubnetA
+  PublicSubnet1Id:
+    Value: !Ref PublicSubnet1
     Export:
-      Name: !Sub ${ProjectName}-PublicSubnetA
+      Name: !Sub "${Environment}-${ProjectName}-PublicSubnet1Id"
 
-  PublicSubnetB:
-    Value: !Ref PublicSubnetB
+  PublicSubnet2Id:
+    Value: !Ref PublicSubnet2
     Export:
-      Name: !Sub ${ProjectName}-PublicSubnetB
+      Name: !Sub "${Environment}-${ProjectName}-PublicSubnet2Id"
 
-  PrivateSubnetA:
-    Value: !Ref PrivateSubnetA
+  PrivateSubnet1Id:
+    Value: !Ref PrivateSubnet1
     Export:
-      Name: !Sub ${ProjectName}-PrivateSubnetA
+      Name: !Sub "${Environment}-${ProjectName}-PrivateSubnet1Id"
 
-  PrivateSubnetB:
-    Value: !Ref PrivateSubnetB
+  PrivateSubnet2Id:
+    Value: !Ref PrivateSubnet2
     Export:
-      Name: !Sub ${ProjectName}-PrivateSubnetB
+      Name: !Sub "${Environment}-${ProjectName}-PrivateSubnet2Id"
 
-  VPCEndpointSecurityGroupId:
-    Value: !Ref VPCEndpointSecurityGroup
+  PrivateRTId:
+    Value: !Ref PrivateRT
     Export:
-      Name: !Sub ${ProjectName}-VPCEndpointSGId
+      Name: !Sub "${Environment}-${ProjectName}-PrivateRTId"
+
+  VpcCidr:
+    Value: 10.0.0.0/16
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-VpcCidr"

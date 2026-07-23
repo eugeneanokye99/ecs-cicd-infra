@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: BEM13 ECS CICD | Stack 5 of 8 — ALB with blue/green target groups
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, test, prod]
+  ProjectName:
+    Type: String
+    Default: bem13
+  AppPort:
+    Type: Number
+    Default: 8080
+
+Resources:
+
+  # ── Application Load Balancer ──────────────────────────────────
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${Environment}-${ProjectName}-alb"
+      Scheme: internet-facing
+      Type: application
+      IpAddressType: ipv4
+      Subnets:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PublicSubnet1Id"
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PublicSubnet2Id"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-AlbSgId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-alb"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── Blue Target Group (initial / current production) ──────────
+  BlueTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${Environment}-${ProjectName}-blue-tg"
+      Port: !Ref AppPort
+      Protocol: HTTP
+      TargetType: ip
+      VpcId:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcId"
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-blue-tg"
+        - Key: Slot
+          Value: blue
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── Green Target Group (new deployment / CodeDeploy swap) ─────
+  GreenTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${Environment}-${ProjectName}-green-tg"
+      Port: !Ref AppPort
+      Protocol: HTTP
+      TargetType: ip
+      VpcId:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcId"
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-green-tg"
+        - Key: Slot
+          Value: green
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── Production Listener (port 80) ─────────────────────────────
+  # Routes live traffic. CodeDeploy swaps which target group
+  # receives traffic when it completes a blue/green deployment.
+  ProductionListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref BlueTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-prod-listener"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+Outputs:
+  AlbDnsName:
+    Value: !GetAtt ALB.DNSName
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-AlbDnsName"
+
+  AlbArn:
+    Value: !Ref ALB
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-AlbArn"
+
+  BlueTargetGroupArn:
+    Value: !Ref BlueTargetGroup
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-BlueTargetGroupArn"
+
+  BlueTargetGroupName:
+    Value: !GetAtt BlueTargetGroup.TargetGroupName
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-BlueTargetGroupName"
+
+  GreenTargetGroupArn:
+    Value: !Ref GreenTargetGroup
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-GreenTargetGroupArn"
+
+  GreenTargetGroupName:
+    Value: !GetAtt GreenTargetGroup.TargetGroupName
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-GreenTargetGroupName"
+
+  ProductionListenerArn:
+    Value: !Ref ProductionListener
+    Export:
+      Name: !Sub "${Environment}-${ProjectName}-ProductionListenerArn"

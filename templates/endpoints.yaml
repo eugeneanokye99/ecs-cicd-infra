@@ -1,0 +1,140 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: BEM13 ECS CICD | Stack 4 of 8 — VPC endpoints for ECR, S3, CloudWatch
+
+# Required so ECS Fargate tasks in private subnets can reach AWS
+# services (ECR for image pulls, CloudWatch for logs) without a
+# public IP or routing through the internet.
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, test, prod]
+  ProjectName:
+    Type: String
+    Default: bem13
+
+Resources:
+
+  # ── ECR API (Interface) ────────────────────────────────────────
+  # Used by ECS agent to authenticate with ECR.
+  EcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcId"
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet1Id"
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet2Id"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcEndpointSgId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-ecr-api-endpoint"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── ECR DKR (Interface) ────────────────────────────────────────
+  # Used by Docker daemon inside ECS tasks to pull image layers.
+  EcrDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcId"
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet1Id"
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet2Id"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcEndpointSgId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-ecr-dkr-endpoint"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── S3 Gateway ────────────────────────────────────────────────
+  # ECR stores Docker image layers in S3; tasks pull them via this
+  # gateway endpoint (no data-transfer charge, no interface ENI).
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcId"
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateRTId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-s3-gateway-endpoint"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── SSM Parameter Store (Interface) ───────────────────────────
+  # Required for ECS task execution role to resolve secrets.valueFrom
+  # SSM parameters at task launch (e.g. SPRING_PROFILES_ACTIVE).
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcId"
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet1Id"
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet2Id"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcEndpointSgId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-ssm-endpoint"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
+
+  # ── CloudWatch Logs (Interface) ────────────────────────────────
+  # Allows the awslogs log driver inside tasks to ship log streams
+  # without leaving the VPC.
+  CloudWatchLogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcId"
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet1Id"
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-PrivateSubnet2Id"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub "${Environment}-${ProjectName}-VpcEndpointSgId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-${ProjectName}-cloudwatch-logs-endpoint"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation-GitSync
