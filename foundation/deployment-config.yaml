@@ -8,6 +8,8 @@ stack-name: ecs-cicd-stack
 region: eu-central-1
 
 parameters:
+  ProjectName: bem13
+  Environment: prod
   GithubOrg: eugeneanokye99
   GithubRepo: ecs-cicd-infra
   TemplatesBucket: ecs-cloudformation-infra

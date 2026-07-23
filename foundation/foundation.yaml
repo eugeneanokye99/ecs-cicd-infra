@@ -133,26 +133,26 @@ Outputs:
   RepositoryUri:
     Value: !GetAtt ECRRepository.RepositoryUri
     Export:
-      Name: !Sub ${ProjectName}-ECRRepositoryUri
+      Name: !Sub ${Environment}-${ProjectName}-RepositoryUri
 
   RepositoryName:
     Value: !Ref ECRRepository
     Export:
-      Name: !Sub ${ProjectName}-ECRRepositoryName
+      Name: !Sub ${Environment}-${ProjectName}-RepositoryName
 
   RepositoryArn:
     Value: !GetAtt ECRRepository.Arn
     Export:
-      Name: !Sub ${ProjectName}-ECRRepositoryArn
+      Name: !Sub ${Environment}-${ProjectName}-RepositoryArn
 
   OIDCProviderArn:
     Description: ARN of the GitHub Actions OIDC provider - pass this to master.yaml's OIDCProviderArn parameter
     Value: !Ref GitHubOIDCProvider
     Export:
-      Name: !Sub ${ProjectName}-GitHubOIDCProviderArn
+      Name: !Sub ${Environment}-${ProjectName}-GitHubOIDCProviderArn
 
   PipelineGitHubOIDCRoleArn:
     Description: Role ARN to set as AWS_ROLE_ARN secret in this infra repo's GitHub Actions
     Value: !GetAtt PipelineGitHubOIDCRole.Arn
     Export:
-      Name: !Sub ${ProjectName}-PipelineGitHubOIDCRoleArn
+      Name: !Sub ${Environment}-${ProjectName}-PipelineGitHubOIDCRoleArn
