@@ -149,7 +149,7 @@ Resources:
                 AppSpecTemplateArtifact: DeployArtifacts
                 AppSpecTemplatePath: appspec.yaml
                 Image1ArtifactName: DeployArtifacts
-                Image1ContainerName: app
+                Image1ContainerName: IMAGE1_NAME
               InputArtifacts:
                 - Name: DeployArtifacts
               RunOrder: 1
