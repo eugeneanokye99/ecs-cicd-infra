@@ -266,6 +266,11 @@ Resources:
                   - ecr:PutImage
                   - ecr:BatchGetImage
                 Resource: !Sub "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${ProjectName}-app"
+              - Sid: TaskDefinitionRead
+                Effect: Allow
+                Action:
+                  - ecs:DescribeTaskDefinition
+                Resource: "*"
               - Sid: SsmOutputsRead
                 Effect: Allow
                 Action:
