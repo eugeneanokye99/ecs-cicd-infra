@@ -1,22 +1,3 @@
-template-file-path: templates/master.yaml
-stack-name: prod-bem13-master
-region: eu-central-1
-capabilities:
-  - CAPABILITY_IAM
-  - CAPABILITY_NAMED_IAM
-parameters:
-  Environment: prod
-  ProjectName: bem13
-  TemplateBaseUrl: https://ecs-cloudformation-infra.s3.eu-central-1.amazonaws.com/templates
-  AppPort: 8080
-  DesiredCount: 0
-  MinCapacity: 1
-  MaxCapacity: 4
-  CpuScaleOutThreshold: 70
-  TaskCpu: 1024
-  TaskMemory: 2048
-  BlueTerminationWaitMinutes: 10
-tags:
-  Environment: prod
-  Project: bem13-ecs-cicd
-  ManagedBy: CloudFormation-GitSync
+template-file-path: master.yaml
+parameters: {}
+tags: {}
